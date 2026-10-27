@@ -88,6 +88,7 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
     
     BOOL _isInRouteCalculation;
     BOOL _isInRoutePreview;
+    BOOL _isNavigationPausedForRerouting;
     
     int _calculationProgress;
 
@@ -443,6 +444,7 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
     [_navigationSession finishTrip];
     _navigationSession = nil;
     [self resetNavigationMetadata];
+    _isNavigationPausedForRerouting = NO;
     [_mapTemplate hideTripPreviews];
     if (_delegate)
         [_delegate exitNavigationMode];
@@ -889,6 +891,7 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
     NSLog(@"[CarPlay] Starting new navigation session: %@", _navigationSession);
 
     _navigationSession = [_mapTemplate startNavigationSessionForTrip:trip];
+    _isNavigationPausedForRerouting = NO;
     [self resetNavigationMetadata];
     [self addRouteManeuversToSession];
     [self returnTo3dMode];
@@ -956,7 +959,10 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
         // Rerouting during guidance: refresh the maneuver list known to the vehicle
         dispatch_async(dispatch_get_main_queue(), ^{
             [self resetNavigationMetadata];
-            [self addRouteManeuversToSession];
+            if (_isNavigationPausedForRerouting)
+                [self resumeNavigationAfterRerouting];
+            else
+                [self addRouteManeuversToSession];
         });
     }
 }
@@ -985,11 +991,13 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
 
 - (void) startProgress
 {
+    [self pauseNavigationForRerouting];
     [self enterRouteCalculationMode];
 }
 
 - (void) updateProgress:(int)progress
 {
+    [self pauseNavigationForRerouting];
     if (!_isInRouteCalculation)
     {
         [self enterRouteCalculationMode];
@@ -1051,6 +1059,14 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
     _lastManeuverState = nil;
 }
 
+- (NSArray<CPManeuver *> *)routeManeuversForVehicle API_AVAILABLE(ios(17.4))
+{
+    BOOL leftSide = [OADrivingRegion isLeftHandDriving:[_settings.drivingRegion get]];
+    return [OACarPlayManeuverFactory routeManeuversWithLeftSide:leftSide
+                                             userInterfaceStyle:self.interfaceController.carTraitCollection.userInterfaceStyle
+                                                          limit:kRouteManeuversLimit];
+}
+
 /// Passes the whole remaining route to the vehicle so it can show several upcoming maneuvers in the cluster / HUD.
 - (void)addRouteManeuversToSession
 {
@@ -1058,13 +1074,45 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
     {
         if (!_navigationSession)
             return;
-        BOOL leftSide = [OADrivingRegion isLeftHandDriving:[_settings.drivingRegion get]];
-        NSArray<CPManeuver *> *maneuvers = [OACarPlayManeuverFactory routeManeuversWithLeftSide:leftSide
-                                                                             userInterfaceStyle:self.interfaceController.carTraitCollection.userInterfaceStyle
-                                                                                          limit:kRouteManeuversLimit];
+        NSArray<CPManeuver *> *maneuvers = [self routeManeuversForVehicle];
         if (maneuvers.count > 0)
             [_navigationSession addManeuvers:maneuvers];
     }
+}
+
+/// Tells the vehicle that the route is being recalculated, so it does not show a stale maneuver.
+- (void)pauseNavigationForRerouting
+{
+    if (!_navigationSession || _isNavigationPausedForRerouting)
+        return;
+    _isNavigationPausedForRerouting = YES;
+    [_navigationSession pauseTripForReason:CPTripPauseReasonRerouting description:nil];
+}
+
+/// Gives the vehicle the recalculated route and resumes the paused trip.
+/// Before iOS 17.4 the trip resumes when onLocationUpdate sets new upcoming maneuvers.
+- (void)resumeNavigationAfterRerouting
+{
+    if (@available(iOS 17.4, *))
+    {
+        NSArray<CPManeuver *> *maneuvers = [self routeManeuversForVehicle];
+        if (maneuvers.count == 0)
+            return; // stay paused until the new route is available
+
+        OANextDirectionInfo *info = [_routingHelper getNextRouteDirectionInfo:[[OANextDirectionInfo alloc] init] toSpeak:NO];
+        CPTravelEstimates *tripEstimates = [[CPTravelEstimates alloc] initWithDistanceRemaining:[self getFormattedDistance:_routingHelper.getLeftDistance]
+                                                                                  timeRemaining:(NSTimeInterval)_routingHelper.getLeftTime];
+        CPTravelEstimates *maneuverEstimates = [[CPTravelEstimates alloc] initWithDistanceRemaining:[self getFormattedDistance:info ? info.distanceTo : 0]
+                                                                                      timeRemaining:(NSTimeInterval)[_routingHelper getLeftTimeNextTurn]];
+        CPRouteInformation *routeInformation = [[CPRouteInformation alloc] initWithManeuvers:maneuvers
+                                                                               laneGuidances:@[]
+                                                                            currentManeuvers:@[maneuvers.firstObject]
+                                                                         currentLaneGuidance:[[CPLaneGuidance alloc] init]
+                                                                         tripTravelEstimates:tripEstimates
+                                                                     maneuverTravelEstimates:maneuverEstimates];
+        [_navigationSession resumeTripWithUpdatedRouteInformation:routeInformation];
+    }
+    _isNavigationPausedForRerouting = NO;
 }
 
 - (void)applyNavigationMetadata:(CPManeuver *)maneuver
