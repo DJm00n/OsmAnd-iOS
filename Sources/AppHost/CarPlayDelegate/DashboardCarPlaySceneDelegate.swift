@@ -24,8 +24,7 @@ final class DashboardCarPlaySceneDelegate: UIResponder {
 
     private func configureScene() {
         stopObservingMapViewportSettings()
-        guard window != nil else { return }
-        launchHelper.run(isSceneActive: { [weak self] in self?.isForegroundScene == true }) { [weak self] mapVC in
+        launchHelper.run(isSceneConnected: window != nil, isSceneActive: { [weak self] in self?.isForegroundScene == true }) { [weak self] mapVC in
             guard let self else { return }
             self.mapVC = mapVC
             CarPlayService.shared.configure()
@@ -94,11 +93,15 @@ extension DashboardCarPlaySceneDelegate: CPTemplateApplicationDashboardSceneDele
         NSLog("[CarPlay] DashboardCarPlaySceneDelegate didConnect")
         self.window = window
         dashboardController.shortcutButtons = createDashboardButtons(for: templateApplicationDashboardScene)
+        if launchHelper.takeWaitingForConnection(), isForegroundScene {
+            configureScene()
+        }
     }
     
     func templateApplicationDashboardScene(_ templateApplicationDashboardScene: CPTemplateApplicationDashboardScene, didDisconnect dashboardController: CPDashboardController, from window: UIWindow) {
         NSLog("[CarPlay] DashboardCarPlaySceneDelegate didDisconnect")
         CarPlayService.shared.disconnectScene(.dashboard)
+        launchHelper.cancel()
         stopObservingMapViewportSettings()
         dashboardVC?.detachFromCarPlayWindow()
         dashboardVC = nil

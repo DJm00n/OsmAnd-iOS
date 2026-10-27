@@ -7,6 +7,7 @@ final class CarPlaySceneLaunchHelper {
     private let sceneName: String
     private var isSceneActive: (() -> Bool)?
     private var onReady: ((OAMapViewController) -> Void)?
+    private var isWaitingForConnection = false
     
     init(sceneName: String) {
         self.sceneName = sceneName
@@ -18,8 +19,16 @@ final class CarPlaySceneLaunchHelper {
     
     /// Calls `onReady` right away if the app is already initialized,
     /// otherwise as soon as the app reaches `setupRoot` while `isSceneActive` returns `true`.
-    func run(isSceneActive: @escaping () -> Bool, onReady: @escaping (OAMapViewController) -> Void) {
+    ///
+    /// Starting with iOS 18.5 (CarPlay simulator) `sceneWillEnterForeground` can be called before `didConnect`.
+    /// If the scene is not connected yet (`isSceneConnected == false`), nothing is configured and the helper
+    /// remembers it: call `takeWaitingForConnection()` from `didConnect` and run again if it returns `true`.
+    func run(isSceneConnected: Bool = true, isSceneActive: @escaping () -> Bool, onReady: @escaping (OAMapViewController) -> Void) {
         cancel()
+        guard isSceneConnected else {
+            isWaitingForConnection = true
+            return
+        }
         guard let appDelegate = UIApplication.shared.delegate as? OAAppDelegate else { return }
         appDelegate.initialize()
         
@@ -44,7 +53,14 @@ final class CarPlaySceneLaunchHelper {
         }
     }
     
+    /// Returns `true` once if `run` was called before the scene was connected.
+    func takeWaitingForConnection() -> Bool {
+        defer { isWaitingForConnection = false }
+        return isWaitingForConnection
+    }
+    
     func cancel() {
+        isWaitingForConnection = false
         NotificationCenter.default.removeObserver(self)
         isSceneActive = nil
         onReady = nil
