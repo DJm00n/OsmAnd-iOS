@@ -2030,6 +2030,7 @@
 		FA39D2972E819B030095DF8E /* ErrorHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA39D2962E819B030095DF8E /* ErrorHelper.swift */; };
 		FA4195592AAB55E6007CBBAB /* ShadowTransporentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA4195582AAB55E6007CBBAB /* ShadowTransporentView.swift */; };
 		FA44BF5B2A72A91C000D2F5F /* CarPlaySceneDelegates.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA44BF582A72A91C000D2F5F /* CarPlaySceneDelegates.swift */; };
+		FA44BF5D2A72A91C000D2F5E /* CarPlaySceneLaunchHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA44BF5E2A72A91C000D2F5E /* CarPlaySceneLaunchHelper.swift */; };
 		FA44BF5C2A72A91C000D2F5F /* DashboardCarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA44BF592A72A91C000D2F5F /* DashboardCarPlaySceneDelegate.swift */; };
 		FA44BF692A72F810000D2F5F /* SceneDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = FA44BF672A72F810000D2F5F /* SceneDelegate.mm */; };
 		FA44F8E22D0B215900334FDB /* GpxLoadOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA44F8E12D0B215900334FDB /* GpxLoadOperation.swift */; };
@@ -5563,6 +5564,7 @@
 		FA39D2962E819B030095DF8E /* ErrorHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorHelper.swift; sourceTree = "<group>"; };
 		FA4195582AAB55E6007CBBAB /* ShadowTransporentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowTransporentView.swift; sourceTree = "<group>"; };
 		FA44BF582A72A91C000D2F5F /* CarPlaySceneDelegates.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegates.swift; sourceTree = "<group>"; };
+		FA44BF5E2A72A91C000D2F5E /* CarPlaySceneLaunchHelper.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CarPlaySceneLaunchHelper.swift; sourceTree = "<group>"; };
 		FA44BF592A72A91C000D2F5F /* DashboardCarPlaySceneDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DashboardCarPlaySceneDelegate.swift; sourceTree = "<group>"; };
 		FA44BF672A72F810000D2F5F /* SceneDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = SceneDelegate.mm; sourceTree = "<group>"; };
 		FA44BF682A72F810000D2F5F /* SceneDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SceneDelegate.h; sourceTree = "<group>"; };
@@ -10761,6 +10763,7 @@
 				FA77E7A52AE16E90001BABE2 /* OACarPlayMapDashboardViewController.h */,
 				FA77E7A62AE16E90001BABE2 /* OACarPlayMapDashboardViewController.mm */,
 				FA44BF582A72A91C000D2F5F /* CarPlaySceneDelegates.swift */,
+				FA44BF5E2A72A91C000D2F5E /* CarPlaySceneLaunchHelper.swift */,
 				FA44BF592A72A91C000D2F5F /* DashboardCarPlaySceneDelegate.swift */,
 				C5EE465A2E9D1F8B0019C9E0 /* CarPlayNavigationModeProvider.swift */,
 			);
@@ -13751,6 +13754,7 @@
 				CA4ED855557936D7E91423FC /* OAWeatherHelper.mm in Sources */,
 				CA4ED34FEE569EF38DAC35F6 /* OAWeatherWebClient.mm in Sources */,
 				05898FB22B511E0500E64B58 /* OASvgHelper.mm in Sources */,
+				FA44BF5D2A72A91C000D2F5E /* CarPlaySceneLaunchHelper.swift in Sources */,
 				FA44BF5C2A72A91C000D2F5F /* DashboardCarPlaySceneDelegate.swift in Sources */,
 				46C841392C32F36A00E284B0 /* OANavDirectionsFromAction.m in Sources */,
 				46C8413B2C32F38700E284B0 /* OANavRemoveNextDestination.m in Sources */,

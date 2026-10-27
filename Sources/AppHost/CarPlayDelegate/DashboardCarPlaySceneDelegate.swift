@@ -7,6 +7,7 @@ final class DashboardCarPlaySceneDelegate: UIResponder {
     private var window: UIWindow?
     private var isForegroundScene = false
     private var applicationModeChangedObserver: OAAutoObserverProxy?
+    private let launchHelper = CarPlaySceneLaunchHelper(sceneName: "DashboardCarPlaySceneDelegate")
 
     func sceneWillEnterForeground(_ scene: UIScene) {
         NSLog("[CarPlay] DashboardCarPlaySceneDelegate sceneWillEnterForeground")
@@ -16,40 +17,24 @@ final class DashboardCarPlaySceneDelegate: UIResponder {
 
     func sceneWillResignActive(_ scene: UIScene) {
         NSLog("[CarPlay] DashboardCarPlaySceneDelegate sceneWillResignActive")
-        NotificationCenter.default.removeObserver(self)
+        launchHelper.cancel()
         stopObservingMapViewportSettings()
         isForegroundScene = false
     }
 
     private func configureScene() {
-        NotificationCenter.default.removeObserver(self)
         stopObservingMapViewportSettings()
         guard window != nil else { return }
-        guard let appDelegate = UIApplication.shared.delegate as? OAAppDelegate else { return }
-        appDelegate.initialize()
-
-        if case .setupRoot = appDelegate.appLaunchEvent {
-            // if CarPlay was open without a connected device
-            if appDelegate.rootViewController == nil {
-                appDelegate.rootViewController = OARootViewController()
-            }
-            mapVC = OARootViewController.instance()?.mapPanel.mapViewController
-            if mapVC == nil {
-                mapVC = OAMapViewController()
-                OARootViewController.instance()?.mapPanel.setMap(mapVC)
-            }
-            if let mapVC {
-                CarPlayService.shared.configure()
-                dashboardVC = OACarPlayMapDashboardViewController(carPlay: mapVC)
-                dashboardVC?.attachMapToWindow()
-                self.window?.rootViewController = dashboardVC
-                OARootViewController.instance()?.mapPanel.onCarPlayConnected()
-                updateMapViewport()
-                startObservingMapViewportSettings()
-            }
-        } else {
-            // if the scene becomes active (sceneWillEnterForeground) before setting the root view controller
-            NotificationCenter.default.addObserver(self, selector: #selector(appInitEventConfigureScene(notification:)), name: NSNotification.Name.OALaunchUpdateState, object: nil)
+        launchHelper.run(isSceneActive: { [weak self] in self?.isForegroundScene == true }) { [weak self] mapVC in
+            guard let self else { return }
+            self.mapVC = mapVC
+            CarPlayService.shared.configure()
+            dashboardVC = OACarPlayMapDashboardViewController(carPlay: mapVC)
+            dashboardVC?.attachMapToWindow()
+            window?.rootViewController = dashboardVC
+            OARootViewController.instance()?.mapPanel.onCarPlayConnected()
+            updateMapViewport()
+            startObservingMapViewportSettings()
         }
     }
     
@@ -99,18 +84,6 @@ final class DashboardCarPlaySceneDelegate: UIResponder {
     @objc private func onApplicationModeChanged() {
         DispatchQueue.main.async { [weak self] in
             self?.updateMapViewport()
-        }
-    }
-
-    @objc private func appInitEventConfigureScene(notification: Notification) {
-        NSLog("[CarPlay] DashboardCarPlaySceneDelegate appInitEventConfigureScene")
-        guard let userInfo = notification.userInfo,
-              let item = userInfo["event"] as? Int,
-              let event = AppLaunchEvent(rawValue: item) else { return }
-        if case .setupRoot = event {
-            guard isForegroundScene else { return }
-            NSLog("[CarPlay] DashboardCarPlaySceneDelegate appInitEventConfigureScene success")
-            configureScene()
         }
     }
 }
