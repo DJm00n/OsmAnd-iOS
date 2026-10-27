@@ -24,8 +24,8 @@ final class DashboardCarPlaySceneDelegate: UIResponder {
 
     private func configureScene() {
         stopObservingMapViewportSettings()
-        launchHelper.run(isSceneConnected: window != nil, isSceneActive: { [weak self] in self?.isForegroundScene == true }) { [weak self] mapVC in
-            guard let self else { return }
+        launchHelper.run(isSceneConnected: window != nil, isSceneActive: { [weak self] in self?.isForegroundScene == true }) { [weak self] in
+            guard let self, let mapVC = CarPlaySceneLaunchHelper.ensureMapViewController() else { return }
             self.mapVC = mapVC
             CarPlayService.shared.configure()
             dashboardVC = OACarPlayMapDashboardViewController(carPlay: mapVC)

@@ -13,8 +13,9 @@ final class CarPlaySceneDelegate: UIResponder {
     private var windowToAttach: CPWindow?
     private var carPlayInterfaceController: CPInterfaceController?
     private var isForegroundScene = false
-    /// Starting with iOS 18.5 (CarPlay simulator), a change in behavior was observed: sceneWillEnterForeground is now called before didConnect, whereas previously it was the other way around. To handle this, a variable isWaitingForConfiguration was introduced.
-    private var isWaitingForConfiguration = false
+    /// Starting with iOS 18.5 (CarPlay simulator), sceneWillEnterForeground can be called before didConnect;
+    /// the helper remembers that and the scene is configured from didConnect.
+    private let launchHelper = CarPlaySceneLaunchHelper(sceneName: "CarPlaySceneDelegate")
     /// Set on a new CarPlay connection only, so returning to OsmAnd from another CarPlay app keeps the map where the user left it.
     private var shouldCenterOnMyLocation = false
     
@@ -26,7 +27,7 @@ final class CarPlaySceneDelegate: UIResponder {
     
     func sceneWillResignActive(_ scene: UIScene) {
         NSLog("[CarPlay] CarPlaySceneDelegate sceneWillResignActive")
-        NotificationCenter.default.removeObserver(self)
+        launchHelper.cancel()
         removeListeners()
         isForegroundScene = false
     }
@@ -51,24 +52,11 @@ final class CarPlaySceneDelegate: UIResponder {
     }
     
     private func configureScene() {
-        NotificationCenter.default.removeObserver(self)
-        guard let carPlayInterfaceController, let windowToAttach else {
-            isWaitingForConfiguration = true
-            return
-        }
-        guard let appDelegate = UIApplication.shared.delegate as? OAAppDelegate else { return }
-        appDelegate.initialize()
-        
-        if case .setupRoot = appDelegate.appLaunchEvent {
-            // if CarPlay was open without a connected device
-            if appDelegate.rootViewController == nil {
-                appDelegate.rootViewController = OARootViewController()
-            }
+        launchHelper.run(isSceneConnected: carPlayInterfaceController != nil && windowToAttach != nil,
+                         isSceneActive: { [weak self] in self?.isForegroundScene == true }) { [weak self] in
+            guard let self, let carPlayInterfaceController, let windowToAttach else { return }
             presentInCarPlay(interfaceController: carPlayInterfaceController, window: windowToAttach)
             CarPlayService.shared.configure()
-        } else {
-            // if the scene becomes active (sceneWillEnterForeground) before setting the root view controller
-            NotificationCenter.default.addObserver(self, selector: #selector(appInitEventConfigureScene(notification:)), name: NSNotification.Name.OALaunchUpdateState, object: nil)
         }
     }
     
@@ -141,18 +129,6 @@ final class CarPlaySceneDelegate: UIResponder {
             routingHelper.remove(progressListener)
         }
     }
-    
-    @objc private func appInitEventConfigureScene(notification: Notification) {
-        NSLog("[CarPlay] CarPlaySceneDelegate appInitEventConfigureScene")
-        guard let userInfo = notification.userInfo,
-              let item = userInfo["event"] as? Int,
-              let event = AppLaunchEvent(rawValue: item) else { return }
-        if case .setupRoot = event {
-            guard isForegroundScene else { return }
-            NSLog("[CarPlay] CarPlaySceneDelegate appInitEventConfigureScene success")
-            configureScene()
-        }
-    }
 }
 
 extension CarPlaySceneDelegate: CPTemplateApplicationSceneDelegate {
@@ -162,8 +138,7 @@ extension CarPlaySceneDelegate: CPTemplateApplicationSceneDelegate {
         windowToAttach = window
         carPlayInterfaceController = interfaceController
         shouldCenterOnMyLocation = true
-        if isWaitingForConfiguration, isForegroundScene {
-            isWaitingForConfiguration = false
+        if launchHelper.takeWaitingForConnection(), isForegroundScene {
             configureScene()
         }
     }

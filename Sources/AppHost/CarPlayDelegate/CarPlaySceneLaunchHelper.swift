@@ -1,12 +1,12 @@
 import UIKit
 
-/// Waits until the app root and the map are ready, then hands the map to a secondary CarPlay scene.
-/// Shared by the Dashboard and Instrument Cluster scene delegates.
+/// Waits until the app root is ready, then lets a CarPlay scene configure itself.
+/// Shared by all CarPlay scene delegates.
 final class CarPlaySceneLaunchHelper {
     
     private let sceneName: String
     private var isSceneActive: (() -> Bool)?
-    private var onReady: ((OAMapViewController) -> Void)?
+    private var onReady: (() -> Void)?
     private var isWaitingForConnection = false
     
     init(sceneName: String) {
@@ -23,7 +23,7 @@ final class CarPlaySceneLaunchHelper {
     /// Starting with iOS 18.5 (CarPlay simulator) `sceneWillEnterForeground` can be called before `didConnect`.
     /// If the scene is not connected yet (`isSceneConnected == false`), nothing is configured and the helper
     /// remembers it: call `takeWaitingForConnection()` from `didConnect` and run again if it returns `true`.
-    func run(isSceneConnected: Bool = true, isSceneActive: @escaping () -> Bool, onReady: @escaping (OAMapViewController) -> Void) {
+    func run(isSceneConnected: Bool = true, isSceneActive: @escaping () -> Bool, onReady: @escaping () -> Void) {
         cancel()
         guard isSceneConnected else {
             isWaitingForConnection = true
@@ -37,20 +37,23 @@ final class CarPlaySceneLaunchHelper {
             if appDelegate.rootViewController == nil {
                 appDelegate.rootViewController = OARootViewController()
             }
-            var mapVC = OARootViewController.instance()?.mapPanel.mapViewController
-            if mapVC == nil {
-                mapVC = OAMapViewController()
-                OARootViewController.instance()?.mapPanel.setMap(mapVC)
-            }
-            if let mapVC {
-                onReady(mapVC)
-            }
+            onReady()
         } else {
             // if the scene becomes active before the root view controller is set
             self.isSceneActive = isSceneActive
             self.onReady = onReady
             NotificationCenter.default.addObserver(self, selector: #selector(appInitEvent(notification:)), name: NSNotification.Name.OALaunchUpdateState, object: nil)
         }
+    }
+    
+    /// Returns the app map view controller, creating it if CarPlay was opened without a running app UI.
+    static func ensureMapViewController() -> OAMapViewController? {
+        var mapVC = OARootViewController.instance()?.mapPanel.mapViewController
+        if mapVC == nil {
+            mapVC = OAMapViewController()
+            OARootViewController.instance()?.mapPanel.setMap(mapVC)
+        }
+        return mapVC
     }
     
     /// Returns `true` once if `run` was called before the scene was connected.
