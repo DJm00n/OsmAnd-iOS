@@ -38,6 +38,7 @@
 #import "OAAnnounceTimeDistances.h"
 #import "OAFavoritesHelper.h"
 #import "OACarPlayCategoryResultListController.h"
+#import "OACarPlayManeuverFactory.h"
 #import "OsmAnd_Maps-Swift.h"
 #import "GeneratedAssetSymbols.h"
 #import "OsmAndSharedWrapper.h"
@@ -1011,29 +1012,6 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
     return NSUnitLength.meters;
 }
 
-- (NSString *)defineStreetName
-{
-    OANextDirectionInfo *directionInfo = [_routingHelper getNextRouteDirectionInfo:[[OANextDirectionInfo alloc] init] toSpeak:YES];
-    return [self defineStreetName:directionInfo];
-}
-
-- (NSString *)defineStreetName:(OANextDirectionInfo *)nextDirInfo
-{
-    if (nextDirInfo)
-    {
-        OACurrentStreetName *currentStreetName = [[OACurrentStreetName alloc] initWithStreetName:nextDirInfo];
-        NSString *streetName = currentStreetName.text;
-        if (streetName.length > 0)
-        {
-            NSString *exitRef = currentStreetName.exitRef;
-            return exitRef.length == 0
-                ? streetName
-                : [NSString stringWithFormat:OALocalizedString(@"ltr_or_rtl_combine_via_comma"), exitRef, streetName];
-        }
-    }
-    return @"";
-}
-
 // MARK: Location updates
 
 - (void)onLocationUpdate
@@ -1075,20 +1053,11 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
 
             if (turnType)
             {
-                UIUserInterfaceStyle style = strongSelf.interfaceController.carTraitCollection.userInterfaceStyle;
-                EOATurnDrawableThemeColor themeColor = style == UIUserInterfaceStyleDark
-                    ? EOATurnDrawableThemeColorDark
-                    : EOATurnDrawableThemeColorLight;
-                OATurnDrawable *drawable = [[OATurnDrawable alloc] initWithMini:NO themeColor:themeColor];
-                [drawable setTurnType:turnType];
-                [drawable setTurnImminent:turnImminent deviatedFromRoute:deviatedFromRoute];
-                drawable.textFont = [UIFont scaledSystemFontOfSize:16 weight:UIFontWeightSemibold];
-                CGFloat size = MAX(drawable.pathForTurn.bounds.origin.x + drawable.pathForTurn.bounds.size.width,
-                                   drawable.pathForTurn.bounds.origin.y + drawable.pathForTurn.bounds.size.height);
-                drawable.frame = CGRectMake(0, 0, size, size);
-                [drawable setNeedsDisplay];
-                UIImage *turnImage = [drawable toUIImage];
-                maneuver.symbolImage = turnImage;
+                maneuver.symbolImage = [OACarPlayManeuverFactory turnImageForType:turnType
+                                                                         imminent:turnImminent
+                                                                deviatedFromRoute:deviatedFromRoute
+                                                               userInterfaceStyle:strongSelf.interfaceController.carTraitCollection.userInterfaceStyle
+                                                                        fixedSize:0];
             }
 
             OAAnnounceTimeDistances *atd = strongSelf.routingHelper.getVoiceRouter.getAnnounceTimeDistances;
@@ -1097,11 +1066,11 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
                 float speed = [atd getSpeed:[strongSelf.routingHelper getLastFixedLocation]];
                 int dist = nextDirInfo.distanceTo;
                 nextNextDirInfo = [strongSelf.routingHelper getNextRouteDirectionInfoAfter:nextDirInfo to:[[OANextDirectionInfo alloc] init] toSpeak:YES];
-                nextTurnType = [strongSelf getNextTurnType:atd info:nextNextDirInfo speed:speed distance:dist];
+                nextTurnType = [OACarPlayManeuverFactory followingTurnTypeWithTimeDistances:atd info:nextNextDirInfo speed:speed distance:dist];
             }
 
             maneuver.instructionVariants = @[
-                [strongSelf getNextTurnDescription:nextDirInfo turnType:turnType nextTurnType:nextTurnType]
+                [OACarPlayManeuverFactory nextTurnDescriptionForInfo:nextDirInfo turnType:turnType nextTurnType:nextTurnType]
             ];
 
             CPManeuver *secondaryManeuver;
@@ -1120,14 +1089,10 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
 
                 if (lanes != nil && lanes.size > 0)
                 {
-                    [strongSelf.lanesDrawable setTurnLanes:lanes];
-                    strongSelf.lanesDrawable.imminent = locimminent == 0;
-                    [strongSelf.lanesDrawable updateBounds];
-                    strongSelf.lanesDrawable.frame = CGRectMake(0, 0, strongSelf.lanesDrawable.width, strongSelf.lanesDrawable.height);
-                    [strongSelf.lanesDrawable setNeedsDisplay];
-                    UIImage *lanesImg = [strongSelf.lanesDrawable toUIImage];
                     secondaryManeuver = [[CPManeuver alloc] init];
-                    secondaryManeuver.symbolImage = lanesImg;
+                    secondaryManeuver.symbolImage = [OACarPlayManeuverFactory lanesImageForLanes:lanes
+                                                                                        imminent:locimminent == 0
+                                                                                        drawable:strongSelf.lanesDrawable];
                     secondaryManeuver.instructionVariants = @[];
                     strongSelf.secondaryStyle = CPManeuverDisplayStyleSymbolOnly;
 
@@ -1144,7 +1109,7 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
             {
                 if (@available(iOS 17.4, *))
                 {
-                    NSString *streetName = [strongSelf defineStreetName];
+                    NSString *streetName = [OACarPlayManeuverFactory currentStreetName];
                     if (streetName.length > 0)
                         strongSelf.navigationSession.currentRoadNameVariants = @[streetName];
                     else
@@ -1169,20 +1134,11 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
                 nextTurnType = nextNextDirInfo.directionInfo.turnType;
                 if (!secondaryManeuver && nextTurnType)
                 {
-                    UIUserInterfaceStyle style = strongSelf.interfaceController.carTraitCollection.userInterfaceStyle;
-                    EOATurnDrawableThemeColor themeColor = style == UIUserInterfaceStyleDark
-                        ? EOATurnDrawableThemeColorDark
-                        : EOATurnDrawableThemeColorLight;
-                    OATurnDrawable *drawable = [[OATurnDrawable alloc] initWithMini:NO
-                                                                         themeColor:themeColor];
-                    OASTurnType *turnType = nextNextDirInfo.directionInfo.turnType;
-                    [drawable setTurnType:nextTurnType];
-                    [drawable setTurnImminent:nextNextDirInfo.imminent
-                            deviatedFromRoute:deviatedFromRoute];
-                    drawable.textFont = [UIFont scaledSystemFontOfSize:16 weight:UIFontWeightSemibold];
-                    drawable.frame = CGRectMake(0, 0, kTurnArrowRenderSize, kTurnArrowRenderSize);
-                    [drawable setNeedsDisplay];
-                    nextTurnImage = [drawable toUIImage];
+                    nextTurnImage = [OACarPlayManeuverFactory turnImageForType:nextTurnType
+                                                                      imminent:nextNextDirInfo.imminent
+                                                             deviatedFromRoute:deviatedFromRoute
+                                                            userInterfaceStyle:strongSelf.interfaceController.carTraitCollection.userInterfaceStyle
+                                                                     fixedSize:kTurnArrowRenderSize];
                     secondaryManeuver = [[CPManeuver alloc] init];
                     strongSelf.secondaryStyle = CPManeuverDisplayStyleDefault;
 
@@ -1192,9 +1148,9 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
                     {
                         float speed = [atd getSpeed:[strongSelf.routingHelper getLastFixedLocation]];
                         OANextDirectionInfo *info = [strongSelf.routingHelper getNextRouteDirectionInfoAfter:nextNextDirInfo to:[[OANextDirectionInfo alloc] init] toSpeak:YES];
-                        nextNextTurnType = [strongSelf getNextTurnType:atd info:info speed:speed distance:nextNextDirInfo.distanceTo];
+                        nextNextTurnType = [OACarPlayManeuverFactory followingTurnTypeWithTimeDistances:atd info:info speed:speed distance:nextNextDirInfo.distanceTo];
                     }
-                    NSString *nextStreetName = [strongSelf getSecondNextTurnDescription:nextNextDirInfo turnType:nextTurnType nextTurnType:nextNextTurnType];
+                    NSString *nextStreetName = [OACarPlayManeuverFactory secondNextTurnDescriptionForInfo:nextNextDirInfo turnType:nextTurnType nextTurnType:nextNextTurnType];
                     secondaryManeuver.userInfo = @{
                         @"streetName": nextStreetName,
                     };
@@ -1248,126 +1204,6 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
         }
     });
     [self.delegate onLocationChanged];
-}
-
-- (OASTurnType *) getNextTurnType:(OAAnnounceTimeDistances *)atd info:(OANextDirectionInfo *)info speed:(float)speed distance:(int)distance
-{
-    if ([atd isTurnStateActive:speed dist:distance turnType:kStateTurnIn])
-    {
-        if (info && info.directionInfo &&
-            ([atd isTurnStateActive:speed dist:info.distanceTo turnType:kStateTurnNow]
-             || ![atd isTurnStateNotPassed:speed dist:info.distanceTo turnType:kStateTurnIn]))
-            return info.directionInfo.turnType;
-    }
-    return nullptr;
-}
-
-- (BOOL) shouldKeepLeft:(OASTurnType *)type
-{
-    return type && [OASTurnType.companion isLeftTurnType:type.value];
-}
-
-- (BOOL) shouldKeepRight:(OASTurnType *)type
-{
-    return type && [OASTurnType.companion isRightTurnType:type.value];
-}
-
-- (NSString *) nextTurnsToString:(OASTurnType *)type nextTurnType:(OASTurnType *)nextTurnType
-{
-    if ([type isRoundAbout])
-    {
-        if ([self shouldKeepLeft:nextTurnType])
-            return [NSString stringWithFormat:OALocalizedString(@"auto_25_chars_route_roundabout_kl"), type.exitOut];
-        else if ([self shouldKeepRight:nextTurnType])
-            return [NSString stringWithFormat:OALocalizedString(@"auto_25_chars_route_roundabout_kr"), type.exitOut];
-        else
-            return [NSString stringWithFormat:OALocalizedString(@"route_roundabout_exit"), type.exitOut];
-    }
-    else if (type.value == OASTurnType.companion.TU || type.value == OASTurnType.companion.TRU)
-    {
-        if ([self shouldKeepLeft:nextTurnType])
-            return OALocalizedString(@"auto_25_chars_route_tu_kl");
-        else if ([self shouldKeepRight:nextTurnType])
-            return OALocalizedString(@"auto_25_chars_route_tu_kr");
-        else
-            return OALocalizedString(@"auto_25_chars_route_tu");
-    }
-    else if (type.value == OASTurnType.companion.C)
-    {
-        return OALocalizedString(@"route_head");
-    }
-    else if (type.value == OASTurnType.companion.TSLL)
-    {
-        return OALocalizedString(@"auto_25_chars_route_tsll");
-    }
-    else if (type.value == OASTurnType.companion.TL)
-    {
-        if ([self shouldKeepLeft:nextTurnType])
-            return OALocalizedString(@"auto_25_chars_route_tl_kl");
-        else if ([self shouldKeepRight:nextTurnType])
-            return OALocalizedString(@"auto_25_chars_route_tl_kr");
-        else
-            return OALocalizedString(@"auto_25_chars_route_tl");
-    }
-    else if (type.value == OASTurnType.companion.TSHL)
-    {
-        return OALocalizedString(@"auto_25_chars_route_tshl");
-    }
-    else if (type.value == OASTurnType.companion.TSLR)
-    {
-        return OALocalizedString(@"auto_25_chars_route_tslr");
-    }
-    else if (type.value == OASTurnType.companion.TR)
-    {
-        if ([self shouldKeepLeft:nextTurnType])
-            return OALocalizedString(@"auto_25_chars_route_tr_kl");
-        else if ([self shouldKeepRight:nextTurnType])
-            return OALocalizedString(@"auto_25_chars_route_tr_kr");
-        else
-            return OALocalizedString(@"auto_25_chars_route_tr");
-    }
-    else if (type.value == OASTurnType.companion.TSHR)
-    {
-        return OALocalizedString(@"auto_25_chars_route_tshr");
-    }
-    else if (type.value == OASTurnType.companion.KL)
-    {
-        return OALocalizedString(@"auto_25_chars_route_kl");
-    }
-    else if (type.value == OASTurnType.companion.KR)
-    {
-        return OALocalizedString(@"auto_25_chars_route_kr");
-    }
-    return @"";
-}
-
-- (NSString *) getNextTurnDescription:(OANextDirectionInfo *)info turnType:(OASTurnType *)turnType nextTurnType:(OASTurnType *)nextTurnType
-{
-    NSString *description = [self getTurnDescription:info];
-    NSString *turnName = turnType ? [self nextTurnsToString:turnType nextTurnType:nextTurnType] : @"";
-
-    if (turnType && [turnType isRoundAbout] && description.length > 0)
-        return [NSString stringWithFormat:OALocalizedString(@"ltr_or_rtl_combine_via_comma"), turnName, description];
-    
-    return description.length > 0 ? description : turnName;
-}
-
-- (NSString *) getSecondNextTurnDescription:(OANextDirectionInfo *)info turnType:(OASTurnType *)turnType nextTurnType:(OASTurnType *)nextTurnType
-{
-    NSString *description = [self getTurnDescription:info];
-    NSString *distance = [OAOsmAndFormatter getFormattedDistance:info.distanceTo withParams:OsmAndFormatterParams.useLowerBounds];
-
-    if (description.length == 0)
-        description = turnType ? [self nextTurnsToString:turnType nextTurnType:nextTurnType] : nil;
-    
-    return description.length == 0 ? distance : [NSString stringWithFormat:OALocalizedString(@"ltr_or_rtl_combine_via_comma"), distance, description];
-}
-
-- (NSString *) getTurnDescription:(OANextDirectionInfo *)info
-{
-    NSString *name = [self defineStreetName:info];
-    NSString *ref = info && info.directionInfo ? info.directionInfo.ref : @"";
-    return name.length > 0 ? name : ref;
 }
 
 // MARK: OACarPlayMapViewDelegate

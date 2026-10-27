@@ -1099,6 +1099,7 @@
 		DA5A815126C563A700F274C7 /* OACarPlayTracksListController.m in Sources */ = {isa = PBXBuildFile; fileRef = DA5A796B26C563A000F274C7 /* OACarPlayTracksListController.m */; };
 		DA5A815226C563A700F274C7 /* OABaseCarPlayListController.m in Sources */ = {isa = PBXBuildFile; fileRef = DA5A796C26C563A000F274C7 /* OABaseCarPlayListController.m */; };
 		DA5A815326C563A700F274C7 /* OACarPlayDashboardInterfaceController.mm in Sources */ = {isa = PBXBuildFile; fileRef = DA5A796E26C563A000F274C7 /* OACarPlayDashboardInterfaceController.mm */; };
+		CA7F00032F0A000100A1B2C3 /* OACarPlayManeuverFactory.mm in Sources */ = {isa = PBXBuildFile; fileRef = CA7F00022F0A000100A1B2C3 /* OACarPlayManeuverFactory.mm */; };
 		DA5A815426C563A700F274C7 /* OACarPlayMapViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = DA5A797026C563A000F274C7 /* OACarPlayMapViewController.mm */; };
 		DA5A815526C563A700F274C7 /* OACarPlayActiveViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = DA5A797126C563A000F274C7 /* OACarPlayActiveViewController.m */; };
 		DA5A815626C563A700F274C7 /* OAWikipediaPlugin.mm in Sources */ = {isa = PBXBuildFile; fileRef = DA5A797826C563A000F274C7 /* OAWikipediaPlugin.mm */; };
@@ -3945,6 +3946,8 @@
 		DA5A797026C563A000F274C7 /* OACarPlayMapViewController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = OACarPlayMapViewController.mm; sourceTree = "<group>"; };
 		DA5A797126C563A000F274C7 /* OACarPlayActiveViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OACarPlayActiveViewController.m; sourceTree = "<group>"; };
 		DA5A797226C563A000F274C7 /* OACarPlayDashboardInterfaceController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OACarPlayDashboardInterfaceController.h; sourceTree = "<group>"; };
+		CA7F00012F0A000100A1B2C3 /* OACarPlayManeuverFactory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OACarPlayManeuverFactory.h; sourceTree = "<group>"; };
+		CA7F00022F0A000100A1B2C3 /* OACarPlayManeuverFactory.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = OACarPlayManeuverFactory.mm; sourceTree = "<group>"; };
 		DA5A797326C563A000F274C7 /* OADirectionsGridController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OADirectionsGridController.h; sourceTree = "<group>"; };
 		DA5A797426C563A000F274C7 /* OACarPlayMapViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OACarPlayMapViewController.h; sourceTree = "<group>"; };
 		DA5A797526C563A000F274C7 /* OACommon.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OACommon.h; sourceTree = "<group>"; };
@@ -7391,6 +7394,8 @@
 				DA5A795D26C563A000F274C7 /* OACarPlayActiveViewController.xib */,
 				DA5A797226C563A000F274C7 /* OACarPlayDashboardInterfaceController.h */,
 				DA5A796E26C563A000F274C7 /* OACarPlayDashboardInterfaceController.mm */,
+				CA7F00012F0A000100A1B2C3 /* OACarPlayManeuverFactory.h */,
+				CA7F00022F0A000100A1B2C3 /* OACarPlayManeuverFactory.mm */,
 				DA5A797426C563A000F274C7 /* OACarPlayMapViewController.h */,
 				DA5A797026C563A000F274C7 /* OACarPlayMapViewController.mm */,
 				DADF31A728D07D1100DC2886 /* OACarPlayPurchaseViewController.h */,
@@ -13366,6 +13371,7 @@
 				27291B612EE81169005D0B0A /* PreviewImageViewTableViewCell.swift in Sources */,
 				DAA61CC42A03983A00AFF65D /* CenterWidgetInfo.swift in Sources */,
 				DA5A815326C563A700F274C7 /* OACarPlayDashboardInterfaceController.mm in Sources */,
+				CA7F00032F0A000100A1B2C3 /* OACarPlayManeuverFactory.mm in Sources */,
 				DA5A84C126C563A900F274C7 /* OAProfileSelectionBottomSheetViewController.m in Sources */,
 				DA5A856726C563A900F274C7 /* OAAmenityLocationPoint.mm in Sources */,
 				DA5A83D226C563A800F274C7 /* OACollapsableLabelView.m in Sources */,
