@@ -204,6 +204,8 @@
 	<dict>
 		<key>CPSupportsDashboardNavigationScene</key>
 		<true/>
+		<key>CPSupportsInstrumentClusterNavigationScene</key>
+		<true/>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<true/>
 		<key>UISceneConfigurations</key>
@@ -217,6 +219,17 @@
 					<string>CarPlay-Dashboard Configuration</string>
 					<key>UISceneDelegateClassName</key>
 					<string>${PRODUCT_MODULE_NAME}.DashboardCarPlaySceneDelegate</string>
+				</dict>
+			</array>
+			<key>CPTemplateApplicationInstrumentClusterSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>CPTemplateApplicationInstrumentClusterScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>CarPlay-InstrumentCluster Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>${PRODUCT_MODULE_NAME}.InstrumentClusterCarPlaySceneDelegate</string>
 				</dict>
 			</array>
 			<key>CPTemplateApplicationSceneSessionRoleApplication</key>

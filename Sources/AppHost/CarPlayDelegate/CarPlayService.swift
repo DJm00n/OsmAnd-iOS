@@ -13,6 +13,7 @@ final class CarPlayService: NSObject {
     enum CarPlaySceneType {
         case app
         case dashboard
+        case instrumentCluster
     }
     
     static let shared = CarPlayService()
@@ -44,6 +45,10 @@ final class CarPlayService: NSObject {
     
     func disconnectScene(_ sceneType: CarPlaySceneType) {
         guard OsmAndApp.swiftInstance().initialized else {
+            return
+        }
+        // The cluster is an extra display: the app and the Dashboard own the CarPlay session state
+        if case .instrumentCluster = sceneType {
             return
         }
 

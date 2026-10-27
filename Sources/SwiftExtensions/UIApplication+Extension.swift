@@ -11,6 +11,7 @@ extension UIApplication {
         static let defaultConfiguration = "Default Configuration"
         static let carPlayConfiguration = "CarPlay Configuration"
         static let carPlayDashboardConfiguration = "CarPlay-Dashboard Configuration"
+        static let carPlayInstrumentClusterConfiguration = "CarPlay-InstrumentCluster Configuration"
     }
     
     @objc var mainWindow: UIWindow? {
@@ -63,15 +64,27 @@ extension UIApplication {
     }
     
     /// Returns `true` if the app currently has any CarPlay-related scene connected.
-    /// This includes both the main CarPlay app scene and the CarPlay Dashboard scene.
+    /// This includes the main CarPlay app scene, the CarPlay Dashboard scene and the Instrument Cluster scene.
     ///
     /// Does **not** require the scene to be active on screen — only connected.
     @objc var isCarPlayConnected: Bool {
         safelyCheckConnectedScenes {
             connectedScenes.contains { scene in
                 let name = scene.session.configuration.name
-                return name == Constants.carPlayConfiguration || name == Constants.carPlayDashboardConfiguration
+                return name == Constants.carPlayConfiguration
+                    || name == Constants.carPlayDashboardConfiguration
+                    || name == Constants.carPlayInstrumentClusterConfiguration
             }
+        }
+    }
+
+    /// Returns `true` if the CarPlay Instrument Cluster scene is connected.
+    ///
+    /// It is intentionally not part of `isAnyCarPlaySceneActive`: the cluster is an extra display
+    /// and must not change the viewport or gesture logic of the main map.
+    @objc var isCarPlayInstrumentClusterConnected: Bool {
+        safelyCheckConnectedScenes {
+            connectedScenes.contains { $0.session.configuration.name == Constants.carPlayInstrumentClusterConfiguration }
         }
     }
     
