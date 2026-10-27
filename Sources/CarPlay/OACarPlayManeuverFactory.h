@@ -49,6 +49,28 @@ NS_ASSUME_NONNULL_BEGIN
                                                        speed:(float)speed
                                                     distance:(int)distance;
 
+// MARK: Navigation metadata (instrument cluster / HUD)
+
+/// Fills maneuverType, junctionType, trafficSide (and the exit angle for roundabouts) of the maneuver.
++ (void)applyMetadataToManeuver:(CPManeuver *)maneuver
+                       turnType:(nullable OASTurnType *)turnType
+                       leftSide:(BOOL)leftSide
+                         isLast:(BOOL)isLast API_AVAILABLE(ios(17.4));
+
+/// Builds lane guidance for the vehicle. Returns nil if there are no lanes.
++ (nullable CPLaneGuidance *)laneGuidanceForLanes:(nullable OASKotlinIntArray *)lanes
+                                      instruction:(nullable NSString *)instruction API_AVAILABLE(ios(17.4));
+
+/// Maneuver state by distance to the turn: continue -> initial -> prepare -> execute.
++ (CPManeuverState)maneuverStateForDistance:(int)distance
+                                      speed:(float)speed
+                              timeDistances:(OAAnnounceTimeDistances *)atd API_AVAILABLE(ios(17.4));
+
+/// Builds maneuvers (with metadata) for the next route directions, to be passed to CPNavigationSession addManeuvers:.
++ (NSArray<CPManeuver *> *)routeManeuversWithLeftSide:(BOOL)leftSide
+                                   userInterfaceStyle:(UIUserInterfaceStyle)style
+                                                limit:(NSUInteger)limit API_AVAILABLE(ios(17.4));
+
 @end
 
 NS_ASSUME_NONNULL_END

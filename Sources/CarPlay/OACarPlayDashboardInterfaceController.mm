@@ -53,6 +53,7 @@ static NSString * const kUnitsNm = OALocalizedString(@"nm");
 static const CGFloat kTurnArrowSize = 16.0;
 static const CGFloat kTurnArrowRenderSize = 32.0;
 static const NSInteger kTripSubtitleMaxLength = 30;
+static const NSUInteger kRouteManeuversLimit = 20;
 
 typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
     EOACarPlayButtonTypeDismiss = 0,
@@ -102,6 +103,8 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
     UIColor *_darkGuidanceBackgroundColor;
     
     CarPlaySettingsListController *_settingsController;
+    NSString *_lastLaneGuidanceKey;
+    NSNumber *_lastManeuverState;
 }
 
 - (void) commonInit
@@ -439,6 +442,7 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
     _currentTrip = nil;
     [_navigationSession finishTrip];
     _navigationSession = nil;
+    [self resetNavigationMetadata];
     [_mapTemplate hideTripPreviews];
     if (_delegate)
         [_delegate exitNavigationMode];
@@ -885,6 +889,8 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
     NSLog(@"[CarPlay] Starting new navigation session: %@", _navigationSession);
 
     _navigationSession = [_mapTemplate startNavigationSessionForTrip:trip];
+    [self resetNavigationMetadata];
+    [self addRouteManeuversToSession];
     [self returnTo3dMode];
     [[OARootViewController instance].mapPanel startNavigation];
 }
@@ -917,6 +923,23 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
     return _secondaryStyle;
 }
 
+// Share maneuver type, state, junction, traffic side and lanes with the vehicle (instrument cluster / HUD)
+- (BOOL)mapTemplateShouldProvideNavigationMetadata:(CPMapTemplate *)mapTemplate API_AVAILABLE(ios(17.4))
+{
+    return YES;
+}
+
+// The vehicle started its own navigation, so CarPlay guidance is cancelled by the system
+- (void)mapTemplateDidCancelNavigation:(CPMapTemplate *)mapTemplate
+{
+    NSLog(@"[CarPlay] mapTemplateDidCancelNavigation");
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (_navigationSession)
+            [self stopNavigation];
+        [self exitNavigationMode];
+    });
+}
+
 // MARK: - OARouteInformationListener
 
 - (void) newRouteIsCalculated:(BOOL)newRoute
@@ -926,6 +949,14 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
         dispatch_async(dispatch_get_main_queue(), ^{
             _isInRouteCalculation = NO;
             [self enterRoutePreviewMode:YES];
+        });
+    }
+    else
+    {
+        // Rerouting during guidance: refresh the maneuver list known to the vehicle
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self resetNavigationMetadata];
+            [self addRouteManeuversToSession];
         });
     }
 }
@@ -1012,6 +1043,75 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
     return NSUnitLength.meters;
 }
 
+// MARK: Navigation metadata (instrument cluster / HUD)
+
+- (void)resetNavigationMetadata
+{
+    _lastLaneGuidanceKey = nil;
+    _lastManeuverState = nil;
+}
+
+/// Passes the whole remaining route to the vehicle so it can show several upcoming maneuvers in the cluster / HUD.
+- (void)addRouteManeuversToSession
+{
+    if (@available(iOS 17.4, *))
+    {
+        if (!_navigationSession)
+            return;
+        BOOL leftSide = [OADrivingRegion isLeftHandDriving:[_settings.drivingRegion get]];
+        NSArray<CPManeuver *> *maneuvers = [OACarPlayManeuverFactory routeManeuversWithLeftSide:leftSide
+                                                                             userInterfaceStyle:self.interfaceController.carTraitCollection.userInterfaceStyle
+                                                                                          limit:kRouteManeuversLimit];
+        if (maneuvers.count > 0)
+            [_navigationSession addManeuvers:maneuvers];
+    }
+}
+
+- (void)applyNavigationMetadata:(CPManeuver *)maneuver
+                       turnType:(OASTurnType *)turnType
+                       leftSide:(BOOL)leftSide
+                         isLast:(BOOL)isLast
+                          lanes:(OASKotlinIntArray *)lanes
+                       deviated:(BOOL)deviated
+                       distance:(int)distance API_AVAILABLE(ios(17.4))
+{
+    [OACarPlayManeuverFactory applyMetadataToManeuver:maneuver turnType:turnType leftSide:leftSide isLast:isLast];
+
+    CPLaneGuidance *guidance = nil;
+    if (!deviated && lanes && lanes.size > 0)
+        guidance = [OACarPlayManeuverFactory laneGuidanceForLanes:lanes instruction:maneuver.instructionVariants.firstObject];
+    if (guidance)
+    {
+        maneuver.linkedLaneGuidance = guidance;
+        NSMutableArray<NSNumber *> *values = [NSMutableArray array];
+        for (int i = 0; i < lanes.size; i++)
+            [values addObject:@([lanes getIndex:i])];
+        NSString *key = [values componentsJoinedByString:@","];
+        if (![key isEqualToString:_lastLaneGuidanceKey])
+        {
+            _lastLaneGuidanceKey = key;
+            [_navigationSession addLaneGuidances:@[guidance]];
+        }
+    }
+    else
+    {
+        _lastLaneGuidanceKey = nil;
+    }
+
+    CPManeuverState state = CPManeuverStateContinue;
+    OAAnnounceTimeDistances *atd = _routingHelper.getVoiceRouter.getAnnounceTimeDistances;
+    if (!deviated && turnType && atd)
+    {
+        float speed = [atd getSpeed:[_routingHelper getLastFixedLocation]];
+        state = [OACarPlayManeuverFactory maneuverStateForDistance:distance speed:speed timeDistances:atd];
+    }
+    if (!_lastManeuverState || _lastManeuverState.integerValue != state)
+    {
+        _lastManeuverState = @(state);
+        _navigationSession.maneuverState = state;
+    }
+}
+
 // MARK: Location updates
 
 - (void)onLocationUpdate
@@ -1069,11 +1169,14 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
                 nextTurnType = [OACarPlayManeuverFactory followingTurnTypeWithTimeDistances:atd info:nextNextDirInfo speed:speed distance:dist];
             }
 
+            BOOL isLastManeuver = nextDirInfo != nil && (nextNextDirInfo == nil || nextNextDirInfo.directionInfo == nil);
+
             maneuver.instructionVariants = @[
                 [OACarPlayManeuverFactory nextTurnDescriptionForInfo:nextDirInfo turnType:turnType nextTurnType:nextTurnType]
             ];
 
             CPManeuver *secondaryManeuver;
+            OASKotlinIntArray *metadataLanes;
             nextDirInfo = [strongSelf.routingHelper getNextRouteDirectionInfo:calc toSpeak:NO];
             if (nextDirInfo && nextDirInfo.directionInfo && nextDirInfo.directionInfo.turnType)
             {
@@ -1089,6 +1192,7 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
 
                 if (lanes != nil && lanes.size > 0)
                 {
+                    metadataLanes = lanes;
                     secondaryManeuver = [[CPManeuver alloc] init];
                     secondaryManeuver.symbolImage = [OACarPlayManeuverFactory lanesImageForLanes:lanes
                                                                                         imminent:locimminent == 0
@@ -1126,6 +1230,16 @@ typedef NS_ENUM(NSInteger, EOACarPlayButtonType) {
                 @"turnImminent": turnType ? @(turnImminent) : @(-1),
                 @"deviatedFromRoute": turnType ? @(deviatedFromRoute) : @(NO),
             };
+            if (@available(iOS 17.4, *))
+            {
+                [strongSelf applyNavigationMetadata:maneuver
+                                           turnType:turnType
+                                           leftSide:leftSide
+                                             isLast:isLastManeuver
+                                              lanes:metadataLanes
+                                           deviated:deviatedFromRoute
+                                           distance:nextTurnDistance];
+            }
             [upcomingManeuvers addObject:maneuver];
 
             UIImage *nextTurnImage;
